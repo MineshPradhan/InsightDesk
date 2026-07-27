@@ -156,14 +156,6 @@ from an environment variable:
 | `web` | Amplify, or Fargate + CloudFront |
 | model cache | S3-backed EFS mount, or baked into the image (the Dockerfile does this) |
 
-## What I would build next
-
-* Move the triage centroids to a nightly Celery job with a versioned artefact in S3, so the
-  in-process `lru_cache` stops being the source of truth.
-* A/B two rerankers per queue and read the winner off the `TriageResult` accuracy series.
-* Stream drafts over SSE instead of polling — the detail panel currently waits on a task.
-* Replace the synthesised timestamps with a real event stream once there is one.
-
 ## Licence
 
 Code MIT. The datasets carry their own terms — CC-BY-NC-4.0 and CDLA-Sharing-1.0 respectively.
