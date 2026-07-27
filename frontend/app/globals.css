@@ -1,0 +1,44 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Inter:wght@400;450;500;600&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-feature-settings: "cv05", "ss01";
+  }
+  body {
+    @apply bg-paper text-ink antialiased;
+  }
+  ::selection {
+    @apply bg-signal text-white;
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-signal ring-offset-2 ring-offset-paper;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    @apply font-mono text-eyebrow uppercase text-muted;
+  }
+  .board {
+    @apply font-board uppercase tracking-[0.02em];
+  }
+  .card {
+    @apply rounded-card border border-rule bg-card shadow-card;
+  }
+  /* Priority is encoded twice — colour plus a left rule weight — so the board
+     is still readable for colour-blind agents and in greyscale print. */
+  .flag-critical { @apply border-l-[3px] border-l-critical; }
+  .flag-high     { @apply border-l-[3px] border-l-high; }
+  .flag-medium   { @apply border-l-2 border-l-medium; }
+  .flag-low      { @apply border-l border-l-low; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

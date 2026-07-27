@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InsightDesk — support triage console</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E7EAF1; --card:#FFF; --ink:#0F1319; --muted:#6B7385; --rule:#CFD5E2;
+  --signal:#2A3FD4; --wash:#EDF0FF;
+  --critical:#C31F45; --high:#D2760B; --medium:#3E7CB1; --low:#7C8698; --ok:#1B7F62;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font:450 14px/1.5 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.board{font-family:'IBM Plex Sans Condensed',sans-serif;text-transform:uppercase;letter-spacing:.02em}
+.mono{font-family:'IBM Plex Mono',monospace}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:3px;box-shadow:0 1px 0 rgba(15,19,25,.05),0 1px 3px rgba(15,19,25,.06)}
+::selection{background:var(--signal);color:#fff}
+button{font:inherit;cursor:pointer;background:none;border:none;color:inherit}
+button:focus-visible,input:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+
+/* header */
+header{position:sticky;top:0;z-index:30;border-bottom:1px solid var(--rule);background:rgba(231,234,241,.88);backdrop-filter:blur(8px)}
+.hwrap{max-width:1440px;margin:0 auto;padding:11px 20px;display:flex;align-items:center;gap:32px}
+.logo{font-family:'IBM Plex Sans Condensed',sans-serif;font-weight:700;font-size:17px;letter-spacing:.06em;text-transform:uppercase}
+.logo span{color:var(--signal)}
+.tabs{display:flex;gap:4px}
+.tab{font-family:'IBM Plex Sans Condensed',sans-serif;text-transform:uppercase;font-weight:600;font-size:13px;padding:6px 12px;color:var(--muted);transition:.15s}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected=true]{background:var(--ink);color:var(--paper)}
+.live{margin-left:auto;display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(27,127,98,.6);animation:pulse 2s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 7px rgba(27,127,98,0)}100%{box-shadow:0 0 0 0 rgba(27,127,98,0)}}
+
+main{max-width:1440px;margin:0 auto;padding:16px 20px 60px}
+.page{display:none}.page.on{display:block}
+.ptitle{font-family:'IBM Plex Sans Condensed',sans-serif;text-transform:uppercase;font-weight:700;font-size:22px}
+.psub{font-size:13px;color:var(--muted);margin-top:2px}
+.rowtop{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;gap:16px;flex-wrap:wrap}
+.chips{display:flex;gap:4px}
+.chip{font-family:'IBM Plex Sans Condensed',sans-serif;text-transform:uppercase;font-weight:600;font-size:11px;padding:5px 10px;border:1px solid var(--rule);color:var(--muted)}
+.chip[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+
+/* signature: triage stream */
+.stream{padding:12px 16px 12px;margin-bottom:14px}
+.streamhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:12px;flex-wrap:wrap}
+.legend{display:flex;gap:12px;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted)}
+.legend i{display:inline-block;width:3px;height:9px;margin-right:5px;vertical-align:-1px}
+.ticks{display:flex;align-items:flex-end;gap:3px;height:64px;overflow:hidden}
+.tick{width:6px;flex:none;border-radius:1px;transform-origin:bottom;transform:scaleY(0);animation:grow .45s cubic-bezier(.2,.9,.3,1) forwards;opacity:.82;transition:width .15s,opacity .15s}
+.tick:hover{width:11px;opacity:1}
+.tick[aria-current=true]{width:11px;opacity:1;outline:2px solid var(--ink);outline-offset:1px}
+@keyframes grow{to{transform:scaleY(1)}}
+
+.split{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:14px}
+@media(max-width:1080px){.split{grid-template-columns:1fr}}
+.listcol{max-height:calc(100vh - 268px);overflow-y:auto;padding-right:4px;display:flex;flex-direction:column;gap:6px}
+.detailcol{max-height:calc(100vh - 268px);overflow-y:auto}
+
+.trow{width:100%;text-align:left;padding:9px 12px;transition:box-shadow .15s,background .15s;animation:slide .35s ease both}
+@keyframes slide{from{opacity:0;transform:translateY(6px)}}
+.trow:hover{box-shadow:0 2px 0 rgba(15,19,25,.06),0 8px 24px rgba(15,19,25,.1)}
+.trow[aria-current=true]{background:var(--wash);box-shadow:0 2px 0 rgba(15,19,25,.06),0 8px 24px rgba(15,19,25,.1)}
+.f-critical{border-left:3px solid var(--critical)}
+.f-high{border-left:3px solid var(--high)}
+.f-medium{border-left:2px solid var(--medium)}
+.f-low{border-left:1px solid var(--low)}
+.tmeta{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.tid{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)}
+.tq{font-family:'IBM Plex Sans Condensed',sans-serif;text-transform:uppercase;font-size:10px;letter-spacing:.12em;color:var(--muted)}
+.pred{background:var(--wash);color:var(--signal);font-family:'IBM Plex Mono',monospace;font-size:9px;text-transform:uppercase;padding:1px 4px;border-radius:2px}
+.tage{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)}
+.tsubj{font-size:14px;font-weight:500;margin-top:4px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tfoot{margin-top:6px;display:flex;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted)}
+
+/* detail */
+.dhead{padding:16px 20px;border-bottom:1px solid var(--rule)}
+.dbody{padding:16px 20px;border-bottom:1px solid var(--rule);font-size:14px;line-height:1.65;white-space:pre-wrap}
+.dsec{padding:16px 20px;border-bottom:1px solid var(--rule)}
+.dsec:last-child{border-bottom:none}
+.dtitle{font-size:19px;font-weight:600;line-height:1.25;margin-top:6px}
+.tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.tag{border:1px solid var(--rule);padding:1px 6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)}
+.pill{font-family:'IBM Plex Sans Condensed',sans-serif;text-transform:uppercase;font-weight:600;font-size:11px;color:#fff;padding:2px 7px}
+.meters{display:flex;gap:16px;margin-top:12px}
+.meter{flex:1}
+.mlab{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;color:var(--muted)}
+.mbar{height:4px;background:var(--rule);margin-top:4px}
+.mfill{height:100%;width:0;transition:width .8s cubic-bezier(.2,.9,.3,1)}
+.btn{font-family:'IBM Plex Sans Condensed',sans-serif;text-transform:uppercase;font-weight:600;font-size:12px;padding:6px 12px;border:1px solid var(--rule)}
+.btn-dark{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn-sig{background:var(--signal);color:#fff;border-color:var(--signal)}
+.btn-ghost{border-color:var(--signal);color:var(--signal);font-size:11px;padding:4px 10px}
+.actions{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
+.draft{margin-top:12px;font-size:14px;line-height:1.7;white-space:pre-wrap}
+.cite{font-family:'IBM Plex Mono',monospace;color:var(--signal)}
+.sources{margin-top:16px}
+.src{display:flex;align-items:baseline;gap:8px;font-size:12px;padding:3px 0}
+.srcscore{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)}
+.warn{border-left:3px solid var(--high);background:rgba(210,118,11,.06);padding:8px 12px;font-size:13px;margin-top:12px}
+
+/* insights */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:14px}
+@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:620px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{padding:11px 14px}
+.statv{font-family:'IBM Plex Sans Condensed',sans-serif;font-weight:700;font-size:28px;line-height:1;margin-top:6px}
+.statu{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:400;color:var(--muted);margin-left:4px}
+.statn{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-top:4px}
+.charts{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:1000px){.charts{grid-template-columns:1fr}}
+.chartbox{padding:12px 16px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;font-weight:400;color:var(--muted);border-bottom:1px solid var(--rule);padding-bottom:6px}
+td{padding:6px 0;border-bottom:1px solid rgba(207,213,226,.6)}
+td.num{text-align:right;font-family:'IBM Plex Mono',monospace}
+tr:last-child td{border-bottom:none}
+.bar{height:9px;display:block}
+
+/* search */
+.searchrow{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.searchrow input{flex:1;min-width:240px;padding:10px 12px;font:inherit;background:#fff;border:1px solid var(--rule);border-radius:3px}
+.searchrow input::placeholder{color:var(--muted)}
+.sres{padding:11px 16px}
+.sscore{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--signal)}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hwrap">
+    <div class="logo">Insight<span>Desk</span></div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-page="inbox">Inbox</button>
+      <button class="tab" role="tab" aria-selected="false" data-page="search">Search</button>
+      <button class="tab" role="tab" aria-selected="false" data-page="insights">Insights</button>
+    </nav>
+    <div class="live"><span class="dot"></span>worker online · 3 tasks/s</div>
+  </div>
+</header>
+
+<main>
+  <!-- ───────────── INBOX ───────────── -->
+  <section class="page on" id="inbox">
+    <div class="rowtop">
+      <div>
+        <h1 class="ptitle">Inbox</h1>
+        <p class="psub">Routed on arrival. Confidence below 70% waits for you.</p>
+      </div>
+      <div class="chips" id="chips">
+        <button class="chip" aria-pressed="true" data-f="all">All</button>
+        <button class="chip" aria-pressed="false" data-f="critical">Critical</button>
+        <button class="chip" aria-pressed="false" data-f="high">High</button>
+        <button class="chip" aria-pressed="false" data-f="untriaged">Untriaged</button>
+      </div>
+    </div>
+
+    <div class="card stream">
+      <div class="streamhead">
+        <h2 class="eyebrow">Triage stream · height = model confidence</h2>
+        <div class="legend">
+          <span><i style="background:var(--critical)"></i>critical</span>
+          <span><i style="background:var(--high)"></i>high</span>
+          <span><i style="background:var(--medium)"></i>medium</span>
+          <span><i style="background:var(--low)"></i>low</span>
+        </div>
+      </div>
+      <div class="ticks" id="ticks"></div>
+    </div>
+
+    <div class="split">
+      <div class="listcol" id="list"></div>
+      <div class="detailcol"><article class="card" id="detail"></article></div>
+    </div>
+  </section>
+
+  <!-- ───────────── SEARCH ───────────── -->
+  <section class="page" id="search">
+    <h1 class="ptitle">Search</h1>
+    <p class="psub">Meaning first, keywords as a safety net — order numbers and error codes still match exactly.</p>
+    <div class="searchrow">
+      <input id="q" placeholder="refund never arrived after cancelling" value="refund never arrived after cancelling">
+      <button class="chip" aria-pressed="true">Tickets</button>
+      <button class="chip" aria-pressed="false">KB</button>
+      <button class="btn btn-sig" onclick="runSearch()">Search</button>
+    </div>
+    <p class="eyebrow" style="margin-top:24px" id="scount">6 matches · tickets</p>
+    <div id="sresults" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+  </section>
+
+  <!-- ───────────── INSIGHTS ───────────── -->
+  <section class="page" id="insights">
+    <h1 class="ptitle">Insights</h1>
+    <p class="psub">Rolling 30 days. Refreshed every five minutes.</p>
+    <div class="stats" id="stats"></div>
+    <div class="charts">
+      <div class="card chartbox">
+        <h2 class="eyebrow">Arrivals vs resolutions</h2>
+        <div id="areachart"></div>
+      </div>
+      <div class="card chartbox">
+        <h2 class="eyebrow">Routing accuracy by queue</h2>
+        <div id="acc"></div>
+      </div>
+    </div>
+    <div class="card chartbox" style="margin-top:12px">
+      <h2 class="eyebrow">Load by queue</h2>
+      <table>
+        <thead><tr><th>Queue</th><th style="text-align:right">Tickets</th><th style="text-align:right">Critical</th><th style="text-align:right">Median min</th><th style="text-align:right">CSAT</th></tr></thead>
+        <tbody id="qtable"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const C={critical:'var(--critical)',high:'var(--high)',medium:'var(--medium)',low:'var(--low)'};
+const QL=q=>q.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+
+const TICKETS=[
+ {id:'TCK-004182',subj:'Production API returning 503 for all POST /orders since 09:12 UTC',queue:'technical_support',p:'critical',conf:.94,pconf:.91,lat:11,age:'8m',status:'triaged',sent:-0.72,predicted:false,
+  body:"All POST requests to /v1/orders started failing with 503 at 09:12 UTC. GET endpoints are fine. We have ~2,400 orders queued client-side and our checkout is down. This is affecting every customer on our platform right now.\n\nAccount: acme-retail-prod\nRegion: ap-south-1",
+  tags:['api','outage','enterprise'],
+  draft:{grounded:true,text:"Thanks for flagging this — I've escalated it to the platform on-call team as a Sev-1 and they are investigating the 503s on POST /v1/orders now.\n\nWhile we work on it: requests that failed with 503 are safe to retry, since order creation is idempotent when you send the Idempotency-Key header [1]. Queued orders will not be duplicated. Status updates will be posted to the status page and I'll reply here the moment the fix lands [2].\n\nNext step: hold your client-side queue and retry with the same idempotency keys once we confirm recovery.",
+   cites:[{n:1,t:'Idempotent Order Creation',s:.81,r:6.42},{n:2,t:'Incident Communication Policy',s:.74,r:5.18},{n:3,t:'API Error Codes — 5xx',s:.69,r:4.87}]}},
+ {id:'TCK-004181',subj:'Charged twice for the annual plan on the same day',queue:'billing_and_payments',p:'high',conf:.88,pconf:.79,lat:9,age:'22m',status:'new',sent:-0.55,predicted:true,
+  body:"My card was charged twice for the annual plan — both on 14 July, same amount. I only clicked subscribe once. Please refund the duplicate as soon as possible.",tags:['billing','refund'],
+  draft:{grounded:true,text:"I'm sorry about the duplicate charge. Duplicate transactions on the same card within 24 hours are refunded in full and the refund reaches your bank in 5–10 business days [1].\n\nI've flagged the second charge on your account for reversal. You'll get a confirmation email with the refund reference as soon as it's processed [2].\n\nNext step: no action needed from you — reply here if the refund hasn't landed after 10 business days.",
+   cites:[{n:1,t:'Get Refund',s:.79,r:6.11},{n:2,t:'Check Refund Policy',s:.73,r:5.44}]}},
+ {id:'TCK-004180',subj:'Cannot log in after password reset — link says expired',queue:'it_support',p:'medium',conf:.66,pconf:.62,lat:8,age:'41m',status:'new',sent:-0.21,predicted:true,
+  body:"I requested a password reset three times. Every link says 'expired' when I click it, even a minute after receiving the mail. Using Chrome on Windows 11.",tags:['auth'],
+  draft:{grounded:true,text:"Reset links expire 30 minutes after they're issued, and requesting a new one invalidates every earlier link — so if three were requested, only the newest works [1].\n\nTry this: request one final link, then open it in a private window with no autofill. If it still fails, cached credentials are the usual cause and clearing them for our domain resolves it [2].\n\nNext step: request one link and open it in a private window.",
+   cites:[{n:1,t:'Recover Password',s:.84,r:6.90},{n:2,t:'Edit Account',s:.61,r:3.92}]}},
+ {id:'TCK-004179',subj:'Where is my order? Tracking has not moved in 6 days',queue:'returns_and_exchanges',p:'high',conf:.72,pconf:.74,lat:10,age:'1h',status:'in_progress',sent:-0.48,predicted:false,
+  body:"Order #77341 shipped on the 8th and the tracking page has said 'in transit' ever since. Six days. I need this before the weekend.",tags:['shipping','delivery'],
+  draft:{grounded:true,text:"I understand the wait is frustrating. Tracking that hasn't updated for more than five business days is treated as a carrier exception, and we open a trace with the carrier on your behalf [1].\n\nI've started that trace for order 77341. Carriers respond within 48 hours; if the parcel can't be located we ship a replacement at no cost [2].\n\nNext step: watch for the trace reference by email — no action needed from you.",
+   cites:[{n:1,t:'Track Order',s:.77,r:5.83},{n:2,t:'Delivery Period',s:.70,r:5.02}]}},
+ {id:'TCK-004178',subj:'Feature request: bulk CSV export for the analytics tab',queue:'product_support',p:'low',conf:.81,pconf:.71,lat:7,age:'2h',status:'triaged',sent:.31,predicted:false,
+  body:"Loving the new dashboard. When you get a chance, a bulk CSV export on the analytics tab would save our ops team a lot of copy-pasting. No rush at all.",tags:['feature-request'],
+  draft:{grounded:false,text:'',cites:[]}},
+ {id:'TCK-004177',subj:'Rechnung für Juni fehlt im Kundenkonto',queue:'billing_and_payments',p:'medium',conf:.69,pconf:.60,lat:9,age:'3h',status:'new',sent:-0.12,predicted:true,
+  body:"Guten Tag, die Rechnung für Juni erscheint nicht in meinem Konto. Alle anderen Monate sind vorhanden. Können Sie sie bitte erneut senden?",tags:['invoice','de'],
+  draft:{grounded:true,text:"Guten Tag, vielen Dank für Ihre Nachricht. Rechnungen erscheinen im Konto unter Abrechnung → Rechnungen, in der Regel innerhalb von 24 Stunden nach Abschluss des Abrechnungszeitraums [1].\n\nIch habe die Juni-Rechnung erneut an die E-Mail-Adresse Ihres Kontos gesendet [2].\n\nNächster Schritt: Prüfen Sie Ihren Posteingang — melden Sie sich, falls die Rechnung nicht ankommt.",
+   cites:[{n:1,t:'Check Invoice',s:.75,r:5.60},{n:2,t:'Get Invoice',s:.72,r:5.31}]}},
+ {id:'TCK-004176',subj:'Need to switch the account owner before our audit',queue:'customer_service',p:'medium',conf:.58,pconf:.62,lat:8,age:'4h',status:'new',sent:-0.05,predicted:true,
+  body:"Our previous admin left the company. We need ownership transferred to me before the compliance audit on the 30th. What do you need from us?",tags:['account','admin'],
+  draft:{grounded:true,text:"Ownership transfers need written confirmation from the current owner, or, if they've left, a signed request on company letterhead from a director [1].\n\nSend that to the support address and the change is applied within two business days [2].\n\nNext step: send the signed request and reference this ticket.",cites:[{n:1,t:'Switch Account',s:.68,r:4.71},{n:2,t:'Edit Account',s:.64,r:4.20}]}},
+ {id:'TCK-004175',subj:'Thanks — the migration guide worked perfectly',queue:'customer_service',p:'low',conf:.86,pconf:.77,lat:6,age:'5h',status:'resolved',sent:.81,predicted:false,
+  body:"Just wanted to say the v3 migration guide was excellent. Took us 40 minutes end to end. Appreciate the effort that went into it.",tags:['praise'],
+  draft:{grounded:true,text:"Thank you — that's good to hear, and I've passed it to the team who wrote the guide.\n\nIf you hit anything on v3 later, the upgrade notes cover the breaking changes in detail [1].\n\nNext step: nothing needed — I'll close this out.",cites:[{n:1,t:'Product Documentation',s:.58,r:3.44}]}}
+];
+
+// a longer tail for the stream so it reads like a real day's arrivals
+const STREAM=[...TICKETS,...Array.from({length:64},(_,i)=>{
+  const r=(i*2654435761%100)/100;
+  const p=r<.08?'critical':r<.26?'high':r<.68?'medium':'low';
+  return {id:'TCK-'+(4174-i),p,conf:.35+((i*7919)%60)/100*.9,subj:'archived arrival'};
+})];
+
+let filter='all',active=TICKETS[0].id;
+
+function renderStream(){
+  const el=document.getElementById('ticks');
+  el.innerHTML=STREAM.map((t,i)=>
+    `<button class="tick" style="height:${28+t.conf*72}%;background:${C[t.p]};animation-delay:${Math.min(i*8,620)}ms"
+      ${t.id===active?'aria-current="true"':''} title="${t.id} · ${t.p} · ${Math.round(t.conf*100)}% confident"
+      onclick="select('${t.id}')"><span style="position:absolute;left:-9999px">${t.subj}</span></button>`).join('');
+}
+
+function visible(){
+  if(filter==='all')return TICKETS;
+  if(filter==='untriaged')return TICKETS.filter(t=>t.status==='new');
+  return TICKETS.filter(t=>t.p===filter);
+}
+
+function renderList(){
+  document.getElementById('list').innerHTML=visible().map((t,i)=>`
+   <button class="card trow f-${t.p}" ${t.id===active?'aria-current="true"':''} style="animation-delay:${i*18}ms" onclick="select('${t.id}')">
+     <div class="tmeta">
+       <span class="tid">${t.id}</span>
+       <span class="tq">${QL(t.queue)}</span>
+       ${t.predicted?'<span class="pred">predicted</span>':''}
+       <span class="tage">${t.age} ago</span>
+     </div>
+     <p class="tsubj">${t.subj}</p>
+     <div class="tfoot"><span>${t.p}</span><span>·</span><span>${t.status.replace(/_/g,' ')}</span>
+       <span>·</span><span>${Math.round(t.conf*100)}% conf</span><span>·</span><span>${t.lat}ms</span></div>
+   </button>`).join('') || `<div class="card" style="padding:40px;text-align:center">
+     <p class="board" style="font-weight:600">Queue is clear</p>
+     <p style="font-size:13px;color:var(--muted);margin-top:6px">Nothing matches this filter. Clear it to see the rest.</p></div>`;
+}
+
+function renderDetail(){
+  const t=TICKETS.find(x=>x.id===active)||TICKETS[0];
+  const d=t.draft;
+  document.getElementById('detail').innerHTML=`
+   <div class="dhead">
+     <div class="tid">${t.id} · email · ${t.tags.includes('de')?'DE':'EN'}</div>
+     <h1 class="dtitle">${t.subj}</h1>
+     <div class="tags">${t.tags.map(x=>`<span class="tag">${x}</span>`).join('')}</div>
+   </div>
+   <div class="dbody">${t.body}</div>
+
+   <div class="dsec">
+     <div style="display:flex;justify-content:space-between;align-items:baseline">
+       <h2 class="eyebrow">Model triage</h2>
+       <span class="tid">triage-centroid-v1.2 · ${t.lat}ms</span>
+     </div>
+     <div style="display:flex;align-items:baseline;gap:14px;margin-top:12px;flex-wrap:wrap">
+       <span class="board" style="font-size:15px;font-weight:600">${QL(t.queue)}</span>
+       <span class="pill" style="background:${C[t.p]}">${t.p}</span>
+       <span class="tid" style="margin-left:auto">sentiment ${t.sent>0?'+':''}${t.sent.toFixed(2)}</span>
+     </div>
+     <div class="meters">
+       <div class="meter"><div class="mlab"><span>queue confidence</span><span>${Math.round(t.conf*100)}%</span></div>
+         <div class="mbar"><div class="mfill" style="background:${t.conf>.7?'var(--ok)':'var(--high)'}" data-w="${t.conf*100}"></div></div></div>
+       <div class="meter"><div class="mlab"><span>priority confidence</span><span>${Math.round(t.pconf*100)}%</span></div>
+         <div class="mbar"><div class="mfill" style="background:${t.pconf>.7?'var(--ok)':'var(--high)'}" data-w="${t.pconf*100}"></div></div></div>
+     </div>
+     <div class="actions">
+       <button class="btn btn-dark">Accept routing</button>
+       <button class="btn">Reroute</button>
+       ${t.conf<.7?'<span class="tid" style="color:var(--high)">below auto-apply threshold — held for a human</span>':''}
+     </div>
+   </div>
+
+   <div class="dsec">
+     <div style="display:flex;justify-content:space-between;align-items:center">
+       <h2 class="eyebrow">Suggested reply</h2>
+       <button class="btn btn-ghost">Draft from knowledge base</button>
+     </div>
+     ${d.grounded?`
+       <p class="draft">${d.text.replace(/\[(\d)\]/g,'<span class="cite">[$1]</span>')}</p>
+       <div class="sources">
+         <h3 class="eyebrow">Sources</h3>
+         ${d.cites.map(c=>`<div class="src"><span class="cite">[${c.n}]</span><span style="font-weight:500">${c.t}</span>
+           <span class="srcscore">sim ${c.s.toFixed(2)} · rerank ${c.r.toFixed(2)}</span></div>`).join('')}
+       </div>
+       <div class="actions">
+         <button class="btn btn-sig">Send as-is</button>
+         <button class="btn">Edit before sending</button>
+         <span class="tid" style="margin-left:auto">gpt-4o-mini · 1,284ms</span>
+       </div>`
+     :`<div class="warn">No knowledge-base passage covers this (best similarity 0.19, threshold 0.25). Handle manually — and this shape of question has no article on file yet.</div>
+       <div class="actions"><button class="btn">Write a KB article</button><button class="btn">Assign to product</button></div>`}
+   </div>`;
+  requestAnimationFrame(()=>document.querySelectorAll('.mfill').forEach(m=>m.style.width=m.dataset.w+'%'));
+}
+
+function select(id){ if(!TICKETS.find(t=>t.id===id))return; active=id; renderList(); renderDetail(); renderStream(); }
+
+document.getElementById('chips').addEventListener('click',e=>{
+  const b=e.target.closest('.chip'); if(!b)return;
+  filter=b.dataset.f;
+  [...e.currentTarget.children].forEach(c=>c.setAttribute('aria-pressed',c===b));
+  renderList();
+});
+
+document.querySelectorAll('.tab').forEach(tab=>tab.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',t===tab));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id===tab.dataset.page));
+  if(tab.dataset.page==='insights')renderInsights();
+  if(tab.dataset.page==='search')runSearch();
+}));
+
+/* ── search ── */
+const SRES=[
+ {s:.91,t:'Refund for cancelled order #66120 has not arrived after two weeks',m:'billing_and_payments · high · resolved · 41 min'},
+ {s:.87,t:'Cancelled subscription but still waiting on the money back',m:'billing_and_payments · medium · resolved · 88 min'},
+ {s:.84,t:'Order cancelled by support, refund pending since the 3rd',m:'billing_and_payments · high · in progress · —'},
+ {s:.79,t:'Return accepted, no credit on my statement yet',m:'returns_and_exchanges · medium · resolved · 132 min'},
+ {s:.71,t:'How long does a refund take to reach my bank?',m:'customer_service · low · resolved · 12 min'},
+ {s:.64,t:'Double charge reversed but only partially refunded',m:'billing_and_payments · high · resolved · 205 min'}];
+function runSearch(){
+  document.getElementById('scount').textContent=`${SRES.length} matches · tickets`;
+  document.getElementById('sresults').innerHTML=SRES.map(r=>`
+    <div class="card sres"><div style="display:flex;gap:12px;align-items:baseline">
+      <span class="sscore">${Math.round(r.s*100)}</span>
+      <p style="font-size:14px;font-weight:500;flex:1">${r.t}</p></div>
+      <div class="tfoot">${r.m}</div></div>`).join('');
+}
+
+/* ── insights ── */
+const STATS=[['Tickets','8,042','',''],['Open','1,196','','204 critical'],['Median resolution','86','min','p90 412 min'],
+  ['Routing accuracy','84.6','%','p50 9ms'],['Drafts grounded','91.2','%','2,610 generated'],['Avg CSAT','4.11','/5','+0.23 vs prior 30d']];
+const QUEUES=[['Technical Support',1842,214,74,4.02],['Billing and Payments',1610,96,58,4.21],['Customer Service',1388,41,42,4.36],
+  ['Product Support',1094,63,96,4.05],['IT Support',902,88,61,3.94],['Returns and Exchanges',718,22,120,4.18],['Sales and Pre-Sales',488,9,35,4.44]];
+const ACC=[['Technical Support',.91],['Billing and Payments',.89],['Customer Service',.78],['Product Support',.83],['IT Support',.86],['Returns',.88],['Sales',.74]];
+
+function renderInsights(){
+  document.getElementById('stats').innerHTML=STATS.map(([l,v,u,n])=>
+    `<div class="card stat"><p class="eyebrow">${l}</p><p class="statv">${v}${u?`<span class="statu">${u}</span>`:''}</p>${n?`<p class="statn">${n}</p>`:''}</div>`).join('');
+
+  // area chart, hand-rolled SVG
+  const days=30,W=680,H=190,P=26;
+  const seed=(i,a,b)=>a+((Math.sin(i*1.7)+Math.sin(i*.6)+2)/4)*(b-a);
+  const total=Array.from({length:days},(_,i)=>Math.round(seed(i,180,340)));
+  const resolved=total.map((v,i)=>Math.round(v*(0.72+Math.sin(i*.9)*.09)));
+  const crit=total.map((v,i)=>Math.round(v*(0.07+Math.sin(i*1.3)*.02)));
+  const max=Math.max(...total)*1.12;
+  const X=i=>P+i*(W-P*1.4)/(days-1), Y=v=>H-P-(v/max)*(H-P*1.7);
+  const path=a=>a.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  document.getElementById('areachart').innerHTML=`
+  <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;margin-top:6px" role="img" aria-label="Daily arrivals, resolutions and critical tickets over 30 days">
+    <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2A3FD4" stop-opacity=".26"/><stop offset="100%" stop-color="#2A3FD4" stop-opacity="0"/></linearGradient></defs>
+    ${[0,.25,.5,.75,1].map(f=>`<line x1="${P}" x2="${W-P*.4}" y1="${Y(max*f)}" y2="${Y(max*f)}" stroke="#CFD5E2" stroke-dasharray="2 4"/>
+      <text x="4" y="${Y(max*f)+3}" font-family="IBM Plex Mono" font-size="9" fill="#6B7385">${Math.round(max*f)}</text>`).join('')}
+    <path d="${path(total)} L${X(days-1)},${H-P} L${X(0)},${H-P} Z" fill="url(#ag)"/>
+    <path d="${path(total)}" fill="none" stroke="#2A3FD4" stroke-width="1.8"/>
+    <path d="${path(resolved)}" fill="none" stroke="#1B7F62" stroke-width="1.3"/>
+    <path d="${path(crit)}" fill="none" stroke="#C31F45" stroke-width="1.3"/>
+    ${[0,7,14,21,29].map(i=>`<text x="${X(i)}" y="${H-8}" font-family="IBM Plex Mono" font-size="9" fill="#6B7385" text-anchor="middle">D-${29-i}</text>`).join('')}
+  </svg>
+  <div class="legend" style="margin-top:6px">
+    <span><i style="background:var(--signal)"></i>arrived</span>
+    <span><i style="background:var(--ok)"></i>resolved</span>
+    <span><i style="background:var(--critical)"></i>critical</span></div>`;
+
+  document.getElementById('acc').innerHTML=`<div style="margin-top:10px">${ACC.map(([q,v])=>`
+    <div style="margin-bottom:9px">
+      <div class="mlab"><span>${q}</span><span>${(v*100).toFixed(0)}%</span></div>
+      <div class="mbar" style="height:9px"><div class="mfill" style="height:100%;background:${v>.85?'var(--ok)':v>.78?'var(--medium)':'var(--high)'};width:${v*100}%"></div></div>
+    </div>`).join('')}
+    <p class="statn" style="margin-top:10px">Customer Service and Sales absorb the misroutes — both are catch-all queues, so the model has the least separable signal there.</p></div>`;
+
+  document.getElementById('qtable').innerHTML=QUEUES.map(([q,n,c,m,s])=>
+    `<tr><td>${q}</td><td class="num">${n.toLocaleString()}</td><td class="num">${c}</td><td class="num">${m}</td><td class="num">${s.toFixed(2)}</td></tr>`).join('');
+}
+
+renderStream(); renderList(); renderDetail();
+</script>
+</body>
+</html>
