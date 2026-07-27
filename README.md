@@ -156,6 +156,14 @@ from an environment variable:
 | `web` | Amplify, or Fargate + CloudFront |
 | model cache | S3-backed EFS mount, or baked into the image (the Dockerfile does this) |
 
+## Screenshots
+
+<img width="1840" height="1079" alt="Screenshot_20260728_002854" src="https://github.com/user-attachments/assets/2e17f6cd-defc-45dd-bc9e-77195705a13f" />
+
+<img width="1837" height="1080" alt="Screenshot_20260728_002912" src="https://github.com/user-attachments/assets/702945c5-e903-40f1-bf3b-d0e6a1fd9ba9" />
+
+<img width="1834" height="1079" alt="Screenshot_20260728_002927" src="https://github.com/user-attachments/assets/2190a533-7a4b-4ed7-942e-5bd7ff13debb" />
+
 ## Licence
 
 Code MIT. The datasets carry their own terms — CC-BY-NC-4.0 and CDLA-Sharing-1.0 respectively.
