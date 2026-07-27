@@ -96,7 +96,7 @@ export default function InsightsPage() {
                 type="category"
                 dataKey="priority"
                 width={64}
-                tick={{ fontSize: 10, fontFamily: "IBM Plex Mono", textTransform: "uppercase" }}
+                tick={{ fontSize: 10, fontFamily: "IBM Plex Mono"}}
                 tickLine={false}
                 axisLine={false}
               />
